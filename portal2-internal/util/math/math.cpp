@@ -2,8 +2,51 @@
 #include "sdk/misc/ang_t.hpp"
 #include "sdk/misc/vec_t.hpp"
 #include <cstdlib>
+#include <limits>
+#include <type_traits>
 
 namespace util::math {
+    template <typename derived_t, typename value_t>
+    [[nodiscard]] derived_t cast(value_t value) {
+        using derived_limits = std::numeric_limits<derived_t>;
+        using value_limits = std::numeric_limits<value_t>;
+
+        constexpr value_t lower_bound = [&]() {
+            if constexpr (derived_limits::is_signed) {
+                constexpr auto to_bits = derived_limits::digits;
+                if constexpr (detail::exponent_bits<From>() >= to_bits) {
+                    return -std::exp2<value_limits>(to_bits);
+                } else {
+                    return std::numeric_limits<value_limits>::lowest;
+                }
+            } else {
+                return 0.0;
+            }
+        };
+
+        constexpr value_t upper_bound = [&]() {
+            const value_exponent_bits = value_limits::exponent_bits - 1;
+            const derived_exponent_bits = derived_limits::digits;
+
+            if constexpr (exponent_bits >= derived_exponent_bits) {
+                return std::exp2(derived_exponent_bits);
+            } else {
+                return std::numeric_limits<value_t>::infinity;
+            }
+        };
+
+        static_assert(derived_limits::is_iec559);
+        if (std::isnan(value)) {
+            return 0;
+        } else if (value < lower_bound()) {
+            return derived_limits::min();
+        } else if (from >= upper_bound()) {
+            return derived_limits::max();
+        } else {
+            return dynamic_cast<derived_t>(value);
+        }
+    }
+
     float normalize_pitch(float x) {
         while (x > 89.f)
             x -= 180.f;
